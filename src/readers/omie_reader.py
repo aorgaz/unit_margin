@@ -1,3 +1,9 @@
+"""Reader module for OMIE market data files.
+
+Handles parsing of various OMIE file formats (PDBC, PDVD, PIBCI, MIC trades)
+from zipped semicolon-delimited files.
+"""
+
 import pandas as pd
 import zipfile
 import os
@@ -6,8 +12,15 @@ from io import StringIO
 import csv
 
 def parse_omie_standard(content, skip_lines, names):
-    """
-    Parses standard OMIE semicolon files (PDBC, PDVD, etc).
+    """Parse standard OMIE semicolon-delimited files.
+    
+    Args:
+        content: File content as string
+        skip_lines: Number of header lines to skip
+        names: Column names to assign
+        
+    Returns:
+        DataFrame with parsed data
     """
     # OMIE files often end with * or have weird footers.
     # We'll use csv reader manually or pandas with careful checking.
@@ -29,9 +42,13 @@ def parse_omie_standard(content, skip_lines, names):
     return df
 
 def parse_trades(content):
-    """
-    Parses MIC Trades file.
-    Looking for header line "Fecha;Contrato..."
+    """Parse MIC trades file.
+    
+    Args:
+       content: File content as string
+        
+    Returns:
+        DataFrame with parsed trades data
     """
     lines = content.splitlines()
     header_idx = -1
@@ -49,8 +66,14 @@ def parse_trades(content):
     return df
 
 def read_omie_file(zip_path, inner_filename_prefix):
-    """
-    Reads OMIE flat files from zip.
+    """Read OMIE data files from zip archives.
+    
+    Args:
+        zip_path: Path to the OMIE zip file
+        inner_filename_prefix: Prefix to match files within the zip
+        
+    Returns:
+        DataFrame with parsed OMIE data
     """
     logger = logging.getLogger()
     try:

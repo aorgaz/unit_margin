@@ -1,10 +1,20 @@
+"""Reader module for ESIOS indicator data files.
+
+Handles reading CSV files containing ESIOS price indicators.
+"""
+
 import pandas as pd
 import logging
 import os
 
 def read_esios_indicator(file_path):
-    """
-    Reads ESIOS indicator CSV.
+    """Read ESIOS indicator CSV file.
+    
+    Args:
+        file_path: Path to the ESIOS CSV file
+        
+    Returns:
+        DataFrame containing indicator data, or empty DataFrame if not found/error
     """
     logger = logging.getLogger()
     try:

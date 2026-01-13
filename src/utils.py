@@ -1,3 +1,5 @@
+"""Utility functions for logging, time handling, and data processing helpers."""
+
 import logging
 import os
 import datetime
@@ -5,8 +7,14 @@ import pandas as pd
 import pytz
 
 def setup_logging(log_dir="logs"):
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+    """Set up logging configuration for the application.
+    
+    Args:
+        log_dir: Directory where log files will be stored. Default is "logs".
+        
+    Returns:
+        tuple: (logger instance, timestamp string for the log file)
+    """
     
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = os.path.join(log_dir, f"process_{timestamp}.log")
@@ -22,9 +30,15 @@ def setup_logging(log_dir="logs"):
     return logging.getLogger(), timestamp
 
 def get_madrid_time_range(date_str):
-    """
-    Returns start and end datetime for a given date string 'YYYYMMDD' in Europe/Madrid timezone.
-    Important: Handles 23, 24, or 25 hours depending on DST.
+    """Calculate start and end datetime for a date in Europe/Madrid timezone.
+    
+    Correctly handles DST transitions where days can be 23, 24, or 25 hours long.
+    
+    Args:
+        date_str: Date string in format 'YYYYMMDD'
+        
+    Returns:
+        tuple: (start_datetime, end_datetime) in Europe/Madrid timezone
     """
     madrid = pytz.timezone('Europe/Madrid')
     # Naive date
@@ -40,3 +54,22 @@ def get_madrid_time_range(date_str):
     return start, end
 
 
+def find_unit_column(df, candidates=None):
+    """
+    Find unit column in DataFrame using common candidate names.
+    
+    Args:
+        df: DataFrame to search
+        candidates: List of candidate column names (uppercase). If None, uses default list.
+        
+    Returns:
+        Column name if found, None otherwise.
+    """
+    if candidates is None:
+        candidates = [
+            'UNIDAD DE PROGRAMACIÓN', 'UNIDAD DE PROGRAMACION', 
+            'PARTICIPANTE DEL MERCADO', 'CODIGO', 'CODUOG', 
+            'CÓDIGO', 'UP', 'UNIDAD', 'UNIT'
+        ]
+    
+    return next((c for c in df.columns if str(c).upper() in candidates), None)

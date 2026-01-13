@@ -1,3 +1,8 @@
+"""Reader module for I90 ESIOS data files.
+
+Handles reading Excel sheets from zipped I90 daily files.
+"""
+
 import pandas as pd
 import zipfile
 import os
@@ -5,9 +10,14 @@ import logging
 from io import BytesIO
 
 def read_i90_zip(zip_path, sheet_name):
-    """
-    Reads a specific sheet from the Excel file inside the I90 zip.
-    Assumes only one xls file inside definition.
+    """Read a specific sheet from an Excel file inside an I90 zip archive.
+    
+    Args:
+        zip_path: Path to the I90 zip file
+        sheet_name: Name of the Excel sheet to read
+        
+    Returns:
+        DataFrame containing the sheet data, or empty DataFrame if not found/error
     """
     logger = logging.getLogger()
     try:

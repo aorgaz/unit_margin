@@ -1,3 +1,9 @@
+"""Data processing utilities for market data transformation.
+
+Contains functions for normalizing time resolution, merging datasets,
+and calculating margins.
+"""
+
 import pandas as pd
 import numpy as np
 import logging

@@ -1,3 +1,11 @@
+"""Configuration settings for unit margin processing.
+
+This module defines:
+- Target units and years for processing
+- File paths for data sources (ESIOS, OMIE)
+- Market configurations with their data sources and price mappings
+"""
+
 import os
 
 # Filter Configuration
@@ -7,7 +15,7 @@ TARGET_YEARS = [2020, 2021, 2022, 2023, 2024, 2025] # Default, can be overridden
 # Base Paths (Adjust as needed or assume mounted)
 # Using raw string for Windows paths
 #ASE_PATH_SHAREPOINT = r"C:\Sharepoint\Enel Spa\ZZZ_Transfer - Documentos\DATA"
-BASE_PATH_SHAREPOINT = r"C:\Users\albor\envs\unit_margin\DATA"
+BASE_PATH_SHAREPOINT = r"C:\Users\albor\git\unit_margin\DATA"
 
 PATH_ESIOS_I90 = os.path.join(BASE_PATH_SHAREPOINT, "ESIOS", "i90", "Raw")
 PATH_ESIOS_IND = os.path.join(BASE_PATH_SHAREPOINT, "ESIOS", "Ind", "Precios")
