@@ -7,6 +7,7 @@ to eliminate redundant reads of the same files within a single day's processing.
 
 import pandas as pd
 from typing import Callable, Dict, Tuple, Optional
+from src.readers import i90_reader
 
 
 class FileCacheManager:
@@ -22,6 +23,7 @@ class FileCacheManager:
         self._i90_cache.clear()
         self._esios_cache.clear()
         self._omie_cache.clear()
+        i90_reader.clear_workbook_cache()
     
     def get_i90_sheet(self, zip_path: str, sheet_name: str, reader_func: Callable) -> pd.DataFrame:
         """

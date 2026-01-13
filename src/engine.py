@@ -442,7 +442,7 @@ def process_market(mkt, date_obj, target_units, cache_manager):
             df_qty.columns = cols_upper
             
             # Identify Unit Col
-            unit_col = next((c for c in df_qty.columns if c in ['UNIT', 'CODIGO', 'CODUOG', 'CÓDIGO']), None)
+            unit_col = utils.find_unit_column(df_qty, candidates=['UNIT', 'CODIGO', 'CODUOG', 'CÓDIGO'])
             
             # Identify Date Cols
             has_ymd = all(c in df_qty.columns for c in ['YEAR', 'MONTH', 'DAY', 'PERIOD'])
@@ -856,10 +856,9 @@ def process_market(mkt, date_obj, target_units, cache_manager):
 
     # Aggregation
     if not final_df.empty:
-        # Standardize Unit Column Name
-        unit_candidates = ['UNIDAD DE PROGRAMACIÓN', 'UNIDAD DE PROGRAMACION', 'CODIGO', 'CODUOG', 'CÓDIGO', 'UP', 'UNIDAD', 'UNIT', 'UNIDADV', 'UNIDADC'] 
-        
-        found_unit = next((c for c in final_df.columns if str(c).upper() in unit_candidates), None)
+        # Standardize Unit Column Name (includes MIC-specific columns UNIDADV, UNIDADC)
+        unit_candidates = ['UNIDAD DE PROGRAMACIÓN', 'UNIDAD DE PROGRAMACION', 'CODIGO', 'CODUOG', 'CÓDIGO', 'UP', 'UNIDAD', 'UNIT', 'UNIDADV', 'UNIDADC']
+        found_unit = utils.find_unit_column(final_df, candidates=unit_candidates)
         if found_unit:
             final_df = final_df.rename(columns={found_unit: 'Unit'})
 
@@ -922,14 +921,49 @@ def process_market(mkt, date_obj, target_units, cache_manager):
 
     return final_df
 
+def process_single_day(date_obj, target_units, target_markets):
+    """Process all markets for a single day (worker function for parallel processing).
+    
+    Args:
+        date_obj: Date to process
+        target_units: List of unit codes to include
+        target_markets: List of market names to process (or None for all)
+        
+    Returns:
+        tuple: (date_obj, list of DataFrames for this day)
+    """
+    logger = logging.getLogger()
+    cache_manager = file_cache.FileCacheManager()
+    
+    day_results = []
+    
+    logger.info(f"Processing {date_obj}")
+    
+    for mkt in config.MARKET_CONFIG:
+        if target_markets and mkt['market'] not in target_markets:
+            continue
+            
+        df_mkt = process_market(mkt, date_obj, target_units, cache_manager)
+        if not df_mkt.empty:
+            day_results.append(df_mkt)
+    
+    return (date_obj, day_results)
+
+
 def run_process(start_date=None, end_date=None, years=None, target_markets=None):
+    """Run the margin calculation process for specified date ranges.
+    
+    Supports both sequential and parallel processing based on config.MAX_WORKERS.
+    
+    Args:
+        start_date: Start date for processing
+        end_date: End date for processing  
+        years: List of years to process
+        target_markets: List of market names to process (or None for all)
+    """
     logger = logging.getLogger()
     
-    # Logic to determine dates
-    # If explicit start/end, use them.
-    # If years, use them.
-    # If both, prefer start/end? Or error?
-    
+    # Determine date ranges
     date_ranges = []
     
     if start_date and end_date:
@@ -954,49 +988,69 @@ def run_process(start_date=None, end_date=None, years=None, target_markets=None)
     # Ensure output directory exists
     if not os.path.exists("output"):
         os.makedirs("output")
-
-    # Initialize file cache manager
-    cache_manager = file_cache.FileCacheManager()
-
-    current_month_buffer = []
-    last_ym = None
     
+    # Collect all dates to process
+    all_dates = []
     for s_date, e_date in date_ranges:
         current = s_date
         while current <= e_date:
-            # Check for month change to save chunk
-            ym = (current.year, current.month)
+            all_dates.append(current)
+            current += datetime.timedelta(days=1)
+    
+    # Process days (parallel or sequential based on config)
+    max_workers = getattr(config, 'MAX_WORKERS', 1)
+    
+    # Dictionary to accumulate results by month
+    monthly_buffers = {}
+    
+    if max_workers > 1:
+        # Parallel processing
+        logger.info(f"Using parallel processing with {max_workers} workers")
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+        
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all days for processing
+            futures = {executor.submit(process_single_day, date, target_units, target_markets): date 
+                      for date in all_dates}
             
-            if last_ym and ym != last_ym:
-                if current_month_buffer:
-                    chunk_df = pd.concat(current_month_buffer)
-                    fname = f"unit_margin_{last_ym[0]}{last_ym[1]:02d}.csv"
-                    chunk_df.to_csv(os.path.join("output", fname), index=False)
-                    logger.info(f"Saved chunk {fname}")
-                    current_month_buffer = []
-            
-            last_ym = ym
-            
+            # Collect results as they complete
+            for future in as_completed(futures):
+                date_obj = futures[future]
+                try:
+                    _, day_results = future.result()
+                    
+                    # Group by month
+                    ym = (date_obj.year, date_obj.month)
+                    if ym not in monthly_buffers:
+                        monthly_buffers[ym] = []
+                    monthly_buffers[ym].extend(day_results)
+                    
+                except Exception as exc:
+                    logger.error(f"Day {date_obj} generated an exception: {exc}")
+    else:
+        # Sequential processing (original logic)
+        logger.info("Using sequential processing")
+        cache_manager = file_cache.FileCacheManager()
+        
+        for date_obj in all_dates:
             # Clear cache at the start of each new day
             cache_manager.clear()
-            logger.info(f"Processing {current}")
             
-            for mkt in config.MARKET_CONFIG:
-                if target_markets and mkt['market'] not in target_markets:
-                    continue
-                    
-                df_mkt = process_market(mkt, current, target_units, cache_manager)
-                if not df_mkt.empty:
-                    current_month_buffer.append(df_mkt)
+            _, day_results = process_single_day(date_obj, target_units, target_markets)
             
-            current += datetime.timedelta(days=1)
-            
-    # Final flush for the last month
-    if current_month_buffer:
-        chunk_df = pd.concat(current_month_buffer)
-        fname = f"unit_margin_{last_ym[0]}{last_ym[1]:02d}.csv"
-        chunk_df.to_csv(os.path.join("output", fname), index=False)
-        logger.info(f"Saved chunk {fname}")
-    else:
-        if not last_ym:
-             logger.info("No data found to save.")
+            # Group by month
+            ym = (date_obj.year, date_obj.month)
+            if ym not in monthly_buffers:
+                monthly_buffers[ym] = []
+            monthly_buffers[ym].extend(day_results)
+    
+    # Save monthly CSVs
+    for ym, dataframes in sorted(monthly_buffers.items()):
+        if dataframes:
+            chunk_df = pd.concat(dataframes)
+            fname = f"unit_margin_{ym[0]}{ym[1]:02d}.csv"
+            chunk_df.to_csv(os.path.join("output", fname), index=False)
+            logger.info(f"Saved chunk {fname}")
+    
+    if not monthly_buffers:
+        logger.info("No data found to save.")

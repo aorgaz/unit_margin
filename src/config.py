@@ -12,6 +12,9 @@ import os
 TARGET_UNITS = ['GUIG', 'GUIB', 'MLTG', 'MLTB', 'SLTG', 'SLTB', 'TJEG', 'TJEB']
 TARGET_YEARS = [2020, 2021, 2022, 2023, 2024, 2025] # Default, can be overridden
 
+# Performance Configuration
+MAX_WORKERS = 4  # Number of parallel workers for day processing (set to 1 for sequential)
+
 # Base Paths (Adjust as needed or assume mounted)
 # Using raw string for Windows paths
 #ASE_PATH_SHAREPOINT = r"C:\Sharepoint\Enel Spa\ZZZ_Transfer - Documentos\DATA"

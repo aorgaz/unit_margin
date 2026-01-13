@@ -21,7 +21,7 @@ def main():
     # Set to None to use defaults or if not applicable
     manual_years = None #config.TARGET_YEARS  # Example: [2024, 2025]
     manual_start_date = "20230325"            # Example: "20240101" (YYYYMMDD)
-    manual_end_date = "20230327"              # Example: "20240131" (YYYYMMDD)
+    manual_end_date = "20230328"              # Example: "20240131" (YYYYMMDD)
     manual_markets = None # Example: ["PDBF", "PDBC"] - Set to None to run all
     #manual_markets = ["RR Subir", "RR Bajar", "Restricciones tecnicas Subir", "Restricciones tecnicas Bajar", "Restricciones TR Subir", "Restricciones TR Bajar"] # Example: ["PDBF", "PDBC"] - Set to None to run all
     #manual_markets = ["Bilaterales", "PDBC", "PDBF", "Restricciones tecnicas", "PDVP", "PDVD", "MIC"]
