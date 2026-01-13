@@ -1,0 +1,38 @@
+# =======================================================
+# .gitignore - Automatically generated
+# =======================================================
+
+# --- 1. CRITICAL ---
+# Ignore the virtual environment folder (contains thousands of files)
+venv/
+activate_env.bat
+README.txt
+
+# Ignore Python compiled files
+__pycache__/
+*.py[cod]
+
+# Ignore VS Code local settings
+.vscode/
+
+# =======================================================
+# --- GUIDE: HOW TO IGNORE OTHER ITEMS ---
+# (Add your own rules below)
+# =======================================================
+
+# TO IGNORE WHOLE FOLDERS:
+# Write the folder name followed by a slash /
+# Example: output_data/
+# Example: logs/
+
+# TO IGNORE FILE EXTENSIONS:
+# Use the asterisk * as a wildcard
+# Example: *.csv       (Ignores all CSVs, useful for data)
+# Example: *.log       (Ignores log files)
+# Example: *.tmp       (Ignores temporary files)
+
+# TO IGNORE A SPECIFIC FILE:
+# Write the exact name
+# Example: config.json (If it contains API keys)
+# Example: .env        (For secret environment variables)
+
