@@ -13,7 +13,7 @@ __pycache__/
 *.py[cod]
 
 # Ignore VS Code local settings
-.vscode/
+# .vscode/
 
 # =======================================================
 # --- GUIDE: HOW TO IGNORE OTHER ITEMS ---
