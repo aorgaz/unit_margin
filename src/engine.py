@@ -318,7 +318,7 @@ def process_market(mkt, date_obj, target_units, cache_manager):
                     
                     unit_col = utils.find_unit_column(df_qty)
                     
-                    if unit_col:
+                    if unit_col and target_units is not None:
                         df_qty = df_qty[df_qty[unit_col].isin(target_units)]
                     
                     # Apply filters (supports multiple formats)
@@ -490,12 +490,12 @@ def process_market(mkt, date_obj, target_units, cache_manager):
                     fixed_offset = datetime.timezone(datetime.timedelta(hours=1))
                     df_qty['Datetime_UTC1'] = df_qty['Datetime_Madrid'].apply(lambda x: x.astimezone(fixed_offset))
                     
-                    target_set = set(target_units)
-                    
                     # 1. Sell Side (Income -> Positive Qty)
                     # Filter UNIDAD VENTA (Unidad venta)
-                    # Normalized to uppercase -> UNIDAD VENTA
-                    mask_sell = df_qty['UNIDAD VENTA'].isin(target_set)
+                    mask_sell = slice(None)
+                    if target_units is not None:
+                         mask_sell = df_qty['UNIDAD VENTA'].isin(set(target_units))
+                    
                     df_sell = df_qty[mask_sell].copy()
                     df_sell['Unit'] = df_sell['UNIDAD VENTA']
                     df_sell['Quantity'] = pd.to_numeric(df_sell['CANTIDAD'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
@@ -503,8 +503,10 @@ def process_market(mkt, date_obj, target_units, cache_manager):
                     
                     # 2. Buy Side (Expense -> Negative Qty)
                     # Filter UNIDAD COMPRA (Unidad compra)
-                    # Normalized to uppercase -> UNIDAD COMPRA
-                    mask_buy = df_qty['UNIDAD COMPRA'].isin(target_set)
+                    mask_buy = slice(None)
+                    if target_units is not None:
+                         mask_buy = df_qty['UNIDAD COMPRA'].isin(set(target_units))
+
                     df_buy = df_qty[mask_buy].copy()
                     df_buy['Unit'] = df_buy['UNIDAD COMPRA']
                     df_buy['Quantity'] = -pd.to_numeric(df_buy['CANTIDAD'].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
@@ -538,12 +540,11 @@ def process_market(mkt, date_obj, target_units, cache_manager):
                         return df_qty
                     else:
                         return pd.DataFrame()
-                        
-                return pd.DataFrame()
  
             elif unit_col:
                 # Filter Units
-                df_qty = df_qty[df_qty[unit_col].isin(target_units)].copy()
+                if target_units is not None:
+                    df_qty = df_qty[df_qty[unit_col].isin(target_units)].copy()
                  
             if not df_qty.empty:
                 # Construct Datetime from Year/Month/Day/Period
@@ -950,7 +951,7 @@ def process_single_day(date_obj, target_units, target_markets):
     return (date_obj, day_results)
 
 
-def run_process(start_date=None, end_date=None, years=None, target_markets=None):
+def run_process(start_date=None, end_date=None, years=None, target_markets=None, target_units=None):
     """Run the margin calculation process for specified date ranges.
     
     Supports both sequential and parallel processing based on config.MAX_WORKERS.
@@ -960,6 +961,7 @@ def run_process(start_date=None, end_date=None, years=None, target_markets=None)
         end_date: End date for processing  
         years: List of years to process
         target_markets: List of market names to process (or None for all)
+        target_units: List of unit codes to filter (or None for no filtering)
     """
     logger = logging.getLogger()
     
@@ -981,9 +983,10 @@ def run_process(start_date=None, end_date=None, years=None, target_markets=None)
     logger.info(f"Running process for ranges: {date_ranges}")
     if target_markets:
         logger.info(f"Filtering for markets: {target_markets}")
-    
-    # Load target units
-    target_units = config.TARGET_UNITS
+    if target_units:
+        logger.info(f"Filtering for units: {target_units}")
+    else:
+        logger.info("No unit filter applied (processing all units)")
     
     # Ensure output directory exists
     if not os.path.exists("output"):

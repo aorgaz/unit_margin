@@ -23,6 +23,7 @@ def main():
     manual_start_date = "20230325"            # Example: "20240101" (YYYYMMDD)
     manual_end_date = "20230328"              # Example: "20240131" (YYYYMMDD)
     manual_markets = None # Example: ["PDBF", "PDBC"] - Set to None to run all
+    manual_target_units = config.TARGET_UNITS # Example: ['GUIG', 'GUIB'] or None to process all
     #manual_markets = ["RR Subir", "RR Bajar", "Restricciones tecnicas Subir", "Restricciones tecnicas Bajar", "Restricciones TR Subir", "Restricciones TR Bajar"] # Example: ["PDBF", "PDBC"] - Set to None to run all
     #manual_markets = ["Bilaterales", "PDBC", "PDBF", "Restricciones tecnicas", "PDVP", "PDVD", "MIC"]
     # -------------------------------------------
@@ -50,7 +51,7 @@ def main():
         manual_years = config.TARGET_YEARS
     
     try:
-        engine.run_process(start_date=s_date, end_date=e_date, years=manual_years, target_markets=manual_markets)
+        engine.run_process(start_date=s_date, end_date=e_date, years=manual_years, target_markets=manual_markets, target_units=manual_target_units)
     except Exception as e:
         logger.exception("Fatal error in main process")
         

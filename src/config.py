@@ -10,7 +10,7 @@ import os
 
 # Filter Configuration
 TARGET_UNITS = ['GUIG', 'GUIB', 'MLTG', 'MLTB', 'SLTG', 'SLTB', 'TJEG', 'TJEB']
-TARGET_YEARS = [2020, 2021, 2022, 2023, 2024, 2025] # Default, can be overridden
+TARGET_YEARS = [2020, 2021, 2022, 2023, 2024, 2025]
 
 # Performance Configuration
 MAX_WORKERS = 4  # Number of parallel workers for day processing (set to 1 for sequential)
