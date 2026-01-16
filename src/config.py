@@ -13,12 +13,12 @@ TARGET_UNITS = ['GUIG', 'GUIB', 'MLTG', 'MLTB', 'SLTG', 'SLTB', 'TJEG', 'TJEB']
 TARGET_YEARS = [2020, 2021, 2022, 2023, 2024, 2025]
 
 # Performance Configuration
-MAX_WORKERS = 4  # Number of parallel workers for day processing (set to 1 for sequential)
+MAX_WORKERS = 30  # Number of parallel workers for day processing (set to 1 for sequential)
 
 # Base Paths (Adjust as needed or assume mounted)
 # Using raw string for Windows paths
-#ASE_PATH_SHAREPOINT = r"C:\Sharepoint\Enel Spa\ZZZ_Transfer - Documentos\DATA"
-BASE_PATH_SHAREPOINT = r"C:\Users\albor\git\unit_margin\DATA"
+BASE_PATH_SHAREPOINT = r"C:\Sharepoint\Enel Spa\ZZZ_Transfer - Documentos\DATA"
+#BASE_PATH_SHAREPOINT = r"C:\Users\albor\git\unit_margin\DATA"
 
 PATH_ESIOS_I90 = os.path.join(BASE_PATH_SHAREPOINT, "ESIOS", "i90", "Raw")
 PATH_ESIOS_IND = os.path.join(BASE_PATH_SHAREPOINT, "ESIOS", "Ind", "Precios")
@@ -83,7 +83,7 @@ MARKET_CONFIG = [
         "price_id": None
     },
     {
-        "market": "PIBC",
+        "market": "PIBCI",
         "source": "omie",
         "type": "Energy",
         "data_id": "pibci",
@@ -106,7 +106,7 @@ MARKET_CONFIG = [
         "data_id": "I90DIA05",
         "filters": {"Sentido": "Subir"},
         "price_source": "indicator",
-        "price_id": "BANDA_SUBIR_RULE" 
+        "price_id": "BANDA_SUBIR_RULE"
     },
     { #OK
         "market": "Banda Bajar",
@@ -159,7 +159,7 @@ MARKET_CONFIG = [
         "type": "Energy",
         "data_id": "I90DIA06",
         "quantity_filters": {"Sentido": "Subir", "Redespacho": "RR"},
-        "price_source": "i90", 
+        "price_source": "i90",
         "price_id": "I90DIA11",
         "price_filters": {"Sentido": "Subir", "Tipo": "RR"}
     },
@@ -169,7 +169,7 @@ MARKET_CONFIG = [
         "type": "Energy",
         "data_id": "I90DIA06",
         "quantity_filters": {"Sentido": "Bajar", "Redespacho": "RR"},
-        "price_source": "i90", 
+        "price_source": "i90",
         "price_id": "I90DIA11",
         "price_filters": {"Sentido": "Bajar", "Tipo": "RR"}
     },

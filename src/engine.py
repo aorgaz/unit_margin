@@ -254,7 +254,7 @@ def process_market(mkt, date_obj, target_units, cache_manager):
     4. Calculate margins
     
     NOTE: Quantity reading logic (section 1) mirrors the structure of get_price_data()
-    with separate handling for I90, OMIE, and special markets (MIC, PIBC).
+    with separate handling for I90, OMIE, and special markets (MIC, PIBCI).
     
     Args:
         mkt: Market configuration dictionary
@@ -430,8 +430,22 @@ def process_market(mkt, date_obj, target_units, cache_manager):
             zip_name = f"{data_id}_{ym}.zip"
             zip_path = os.path.join(config.PATH_OMIE, data_id, zip_name)
             
-            inner_prefix = f"{data_id}_{ymd}"
-            df_qty = cache_manager.get_omie_file(zip_path, inner_prefix, omie_reader.read_omie_file)
+            # Initialize as empty DataFrame by default
+            df_qty = pd.DataFrame()
+
+            if market_name == 'PIBCI':
+                dfs_sess = []
+                for s in range(1, 8):  # Sessions 1..7
+                    s_str = f"{s:02d}"
+                    inner_prefix = f"{data_id}_{ymd}{s_str}"
+                    df_part = cache_manager.get_omie_file(zip_path, inner_prefix, omie_reader.read_omie_file)
+                    if df_part is not None and not df_part.empty:
+                        dfs_sess.append(df_part)
+                if dfs_sess:
+                    df_qty = pd.concat(dfs_sess, ignore_index=True)
+            else:
+                inner_prefix = f"{data_id}_{ymd}"
+                df_qty = cache_manager.get_omie_file(zip_path, inner_prefix, omie_reader.read_omie_file)
 
             # The reader now returns standard columns for known types:
             # Year, Month, Day, Period, [Unit], [Quantity]...
@@ -635,13 +649,13 @@ def process_market(mkt, date_obj, target_units, cache_manager):
                         df_qty['Quantity'] = df_qty['POTENCIA ASIGNADA']
 
                     # Specific: PIBCI Session filtering?
-                    # User: "PIBC ss1...ss7". If we have rows for multiple sessions for the same hour?
+                    # User: "PIBCI ss1...ss7". If we have rows for multiple sessions for the same hour?
                     # Usually we take the LAST session? Or sum?
-                    # "PIBC | omie | Energía | pibci...v"
-                    # "PIBC ss1... precio"
+                    # "PIBCI | omie | Energía | pibci...v"
+                    # "PIBCI ss1... precio"
                     # If we have energy from PIBCI, does it contain all sessions?
                     # File has 'NUMSES'.
-                    # User table implies: "PIBC ss (Energie)" -> pibci_...v
+                    # User table implies: "PIBCI ss (Energie)" -> pibci_...v
                     # This file likely contains definitive schedule? Or increments?
                     # Image title: "Resultado incremental del intradiario". "Potencia casada... de forma incremental".
                     # If it's incremental, we might need to sum all sessions for a Target Unit?
@@ -656,7 +670,7 @@ def process_market(mkt, date_obj, target_units, cache_manager):
                     # It will match `pibci_20250101`... but files are `pibci_2025010101`, `02`, etc.
                     # We might be reading just ONE or getting mismatch.
                     # If we need ALL sessions, we need to iterate sessions 1..7?
-                    # Config defines PIBC generally.
+                    # Config defines PIBCI generally.
                     # We should probably iterate valid sessions and concat?
                     # For now, let's allow the reader to pick matching files.
                     # `read_omie_file` picks BEST version.
@@ -673,10 +687,10 @@ def process_market(mkt, date_obj, target_units, cache_manager):
                     # And prices are per session (612..618).
                     # This implies we calculate Margin PER SESSION and SUM?
                     # Or we have a final schedule?
-                    # Prompt: "PIBC ss | omie | Energía | pibci_aaaammddss.v"
-                    # Prompt: "PIBC ss1 | indicador | Precio".
+                    # Prompt: "PIBCI ss | omie | Energía | pibci_aaaammddss.v"
+                    # Prompt: "PIBCI ss1 | indicador | Precio".
                     # Explicit mapping implies we calculate (Qty_SS1 * Price_SS1) + (Qty_SS2 * Price_SS2)...
-                    if market_name == 'PIBC':
+                    if market_name == 'PIBCI':
                         # Handle Sessions
                         # PIBCI file has 'SESSION' column.
                         if 'SESSION' in df_qty.columns:
@@ -798,11 +812,11 @@ def process_market(mkt, date_obj, target_units, cache_manager):
     # SECTION 2: READ PRICE DATA
     # ============================================================================
     # Price data is retrieved via get_price_data() function
-    # Special markets MIC and PIBC may have embedded prices from section 1
+    # Special markets MIC and PIBCI may have embedded prices from section 1
     # ============================================================================
     # Need price for the same range
     # If MIC, we already have price.
-    if market_name == 'MIC' or market_name == 'PIBC': # PIBC handled internally above
+    if market_name == 'MIC' or market_name == 'PIBCI': # PIBCI handled internally above
         df_price = pd.DataFrame()
     else:
         df_price = get_price_data(mkt, date_obj, cache_manager)
@@ -814,7 +828,7 @@ def process_market(mkt, date_obj, target_units, cache_manager):
     # ============================================================================
     final_df = pd.DataFrame()
     
-    if market_name == 'MIC' or market_name == 'PIBC':
+    if market_name == 'MIC' or market_name == 'PIBCI':
         final_df = df_qty
         # Skip standard merge logic
         
@@ -826,6 +840,12 @@ def process_market(mkt, date_obj, target_units, cache_manager):
             merge_keys = ['Datetime_Madrid']
             price_keep_cols = ['Datetime_Madrid', 'Price']
             
+            # Standardize Unit Column Name (includes MIC-specific columns UNIDADV, UNIDADC)
+            unit_candidates = ['UNIDAD DE PROGRAMACIÓN', 'UNIDAD DE PROGRAMACION', 'CODIGO', 'CODUOG', 'CÓDIGO', 'UP', 'UNIDAD', 'UNIT', 'UNIDADV', 'UNIDADC']
+            found_unit = utils.find_unit_column(df_qty, candidates=unit_candidates)
+            if found_unit:
+                df_qty = df_qty.rename(columns={found_unit: 'Unit'})
+
             # If Unit exists in both, include it in merge (for I90DIA09, I90DIA10)
             if 'Unit' in df_qty.columns and 'Unit' in df_price.columns:
                 merge_keys.insert(0, 'Unit')
