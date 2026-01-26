@@ -20,8 +20,8 @@ def main():
     # Change these values directly instead of passing command line arguments
     # Set to None to use defaults or if not applicable
     manual_years = None #config.TARGET_YEARS  # Example: [2024, 2025]
-    manual_start_date = "20200101"            # Example: "20240101" (YYYYMMDD)
-    manual_end_date = "20231231"              # Example: "20240131" (YYYYMMDD)
+    manual_start_date = "20190101"            # Example: "20240101" (YYYYMMDD)
+    manual_end_date = "20251231"              # Example: "20240131" (YYYYMMDD)
     manual_markets = None # Example: ["PDBF", "PDBC"] - Set to None to run all
     manual_target_units = config.TARGET_UNITS # Example: ['GUIG', 'GUIB'] or None to process all
 
@@ -55,8 +55,12 @@ def main():
         logger.exception("Fatal error in main process")
 
     duration = time.time() - start_time
-    logger.info(f"Total Duration: {duration:.2f}s")
+    # Format duration as HH:MM:SS
+    hours, remainder = divmod(int(duration), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    logger.info(f"Total Duration: {hours:02d}:{minutes:02d}:{seconds:02d}")
     print(f"Process finished. Check logs/process_{timestamp}.log")
+
 
 if __name__ == "__main__":
     main()

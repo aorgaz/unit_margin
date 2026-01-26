@@ -56,10 +56,29 @@ def process_mic_trades(mkt, date_obj, target_units, cache_manager):
     
     try:
         # Parse delivery start time from contract field
+        # Format: "YYYYMMDD HH:MM-..." or "YYYYMMDD HH:MMA-..." or "YYYYMMDD HH:MMB-..."
+        # A/B suffixes appear on DST transition days (25-hour days)
         df_trades['DeliveryStart'] = df_trades['CONTRATO'].str.split('-').str[0].str.strip()
-        df_trades['Datetime_Madrid'] = pd.to_datetime(df_trades['DeliveryStart'], format='%Y%m%d %H:%M')
-        df_trades['Datetime_Madrid'] = df_trades['Datetime_Madrid'].dt.tz_localize('Europe/Madrid', ambiguous='infer')
+        
+        # Extract DST suffix (A or B) if present, before parsing
+        # A = first occurrence of ambiguous time, B = second occurrence
+        df_trades['DST_Suffix'] = df_trades['DeliveryStart'].str.extract(r'([AB])$', expand=False)
+        
+        # Remove A/B suffix for parsing
+        df_trades['DeliveryStart_Clean'] = df_trades['DeliveryStart'].str.replace(r'[AB]$', '', regex=True)
+        
+        # Parse datetime
+        df_trades['Datetime_Madrid'] = pd.to_datetime(df_trades['DeliveryStart_Clean'], format='%Y%m%d %H:%M')
+        
+        # Handle timezone localization with DST awareness
+        # For ambiguous times (exist twice due to DST fall back):
+        # - 'A' suffix or no suffix → first occurrence (True = DST, before clock change)
+        # - 'B' suffix → second occurrence (False = standard time, after clock change)
+        is_dst = df_trades['DST_Suffix'].fillna('A') == 'A'
+        df_trades['Datetime_Madrid'] = df_trades['Datetime_Madrid'].dt.tz_localize('Europe/Madrid', ambiguous=is_dst)
+        
         df_trades = df_trades.dropna(subset=['Datetime_Madrid'])
+
         
         # Identify column names (support both abbreviated and full formats)
         seller_col = 'UNIDADV' if 'UNIDADV' in df_trades.columns else 'UNIDAD VENTA'
@@ -565,8 +584,6 @@ def process_single_day(date_obj, target_units, target_markets):
     
     day_results = []
     
-    logger.info(f"Processing {date_obj}")
-    
     for mkt in config.MARKET_CONFIG:
         if target_markets and mkt['market'] not in target_markets:
             continue
@@ -608,19 +625,49 @@ def run_process(start_date=None, end_date=None, years=None, target_markets=None,
     
     max_workers = getattr(config, 'MAX_WORKERS', 1)
     monthly_buffers = {}
+    completed_months = set()  # Track which months have been written
     
     if max_workers > 1:
         logger.info(f"Using parallel processing with {max_workers} workers")
         from concurrent.futures import ProcessPoolExecutor, as_completed
+        
+        # Track expected days per month to know when a month is complete
+        month_day_counts = {}
+        for date in all_dates:
+            ym = (date.year, date.month)
+            month_day_counts[ym] = month_day_counts.get(ym, 0) + 1
+        
+        month_processed_counts = {ym: 0 for ym in month_day_counts}
+        
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(process_single_day, date, target_units, target_markets): date for date in all_dates}
             for future in as_completed(futures):
                 date_obj = futures[future]
                 try:
                     _, day_results = future.result()
+                    
+                    # Log individual day completion (like sequential mode)
+                    logger.info(f"Processing {date_obj}")
+                    
                     ym = (date_obj.year, date_obj.month)
-                    if ym not in monthly_buffers: monthly_buffers[ym] = []
+                    if ym not in monthly_buffers: 
+                        monthly_buffers[ym] = []
                     monthly_buffers[ym].extend(day_results)
+                    
+                    # Track completion
+                    month_processed_counts[ym] += 1
+                    
+                    # Write CSV when month is complete
+                    if month_processed_counts[ym] == month_day_counts[ym] and ym not in completed_months:
+                        if monthly_buffers[ym]:
+                            chunk_df = pd.concat(monthly_buffers[ym])
+                            fname = f"unit_margin_{ym[0]}{ym[1]:02d}.csv"
+                            chunk_df.to_csv(os.path.join("output", fname), index=False)
+                            logger.info(f"Saved chunk {fname}")
+                            completed_months.add(ym)
+                            # Free memory
+                            del monthly_buffers[ym]
+                    
                 except Exception as exc:
                     logger.error(f"Day {date_obj} generated an exception: {exc}")
     else:
@@ -628,14 +675,17 @@ def run_process(start_date=None, end_date=None, years=None, target_markets=None,
         cache_manager = file_cache.FileCacheManager()
         for date_obj in all_dates:
             cache_manager.clear()
+            logger.info(f"Processing {date_obj}")
             _, day_results = process_single_day(date_obj, target_units, target_markets)
             ym = (date_obj.year, date_obj.month)
             if ym not in monthly_buffers: monthly_buffers[ym] = []
             monthly_buffers[ym].extend(day_results)
     
+    # Write any remaining months (for sequential mode or if parallel had issues)
     for ym, dataframes in sorted(monthly_buffers.items()):
-        if dataframes:
+        if dataframes and ym not in completed_months:
             chunk_df = pd.concat(dataframes)
             fname = f"unit_margin_{ym[0]}{ym[1]:02d}.csv"
             chunk_df.to_csv(os.path.join("output", fname), index=False)
             logger.info(f"Saved chunk {fname}")
+
